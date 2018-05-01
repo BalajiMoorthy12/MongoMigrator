@@ -1,0 +1,12 @@
+mongod --logpath C:\Mongo\log\mongo.log --dbpath C:\Mongo\data\db --directoryperdb --install
+
+db.createUser(
+   {
+     user: "accountUser",
+     pwd: "password",
+     roles: [ "readWrite", "dbAdmin" ]
+   }
+)
+
+db.customers.insert( { first_name:"balaji", Last_name:"Moorthy"} )
+
