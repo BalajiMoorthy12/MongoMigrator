@@ -1,0 +1,19 @@
+from openpyxl import workbook
+from openpyxl.reader.excel import load_workbook
+
+class ExcelReadWrite(object):
+    def __init__(self):
+        self.path = None
+        
+    def ExceRead(self,Coulmn_name,Row_name,Sheet_Name):
+        self.path = "G:\Robo\ExcelTry.xlsx"
+        wb = load_workbook(filename=self.path)
+        ws=wb.get_sheet_by_name(Sheet_Name)
+        for coulmn_val in range(1,(ws.max_column)+1):
+            temp_coulmn = ws.cell(row=1, column = coulmn_val).value
+            if  temp_coulmn == Coulmn_name :
+                for row_val in range(2,(ws.max_row)+1):
+                    temp_row = ws.cell(row=row_val, column = 1).value
+                    if str(Row_name) == temp_row:
+                        tempval = ((ws.cell(row=row_val, column = coulmn_val).value))
+                        return tempval
