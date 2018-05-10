@@ -10,3 +10,33 @@ db.createUser(
 
 db.customers.insert( { first_name:"balaji", Last_name:"Moorthy"} )
 
+select * from company
+
+select * from newcompany
+
+CREATE TABLE dd(
+   ID INT PRIMARY KEY     NOT NULL,
+   NAME           TEXT    NOT NULL,
+   AGE            INT     NOT NULL,
+   SALARY         REAL
+);
+
+
+CREATE TABLE SalesRecords(
+	Region 			TEXT NOT NULL,
+	Country 		TEXT NOT NULL,
+	Item_Type 		TEXT NOT NULL,
+	Sales_Channel 	TEXT NOT NULL,
+ 	Order_Priority	CHAR(1) NOT NULL,
+	Order_Date		DATE NOT NULL,
+	Order_ID		INT PRIMARY KEY     NOT NULL,
+	Ship_Date		DATE NOT NULL,
+	Units_Sold		REAL NOT NULL,
+	Unit_Price		REAL NOT NULL,
+	Unit_Cost		REAL NOT NULL,
+	Total_Revenue	REAL NOT NULL,
+	Total_Cost		REAL NOT NULL,
+	Total_Profit	REAL NOT NULL
+);
+
+SELECT * FROM salesrecords
