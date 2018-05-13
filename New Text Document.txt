@@ -21,12 +21,11 @@ CREATE TABLE dd(
    SALARY         REAL
 );
 
-
-CREATE TABLE SalesRecords(
-	Region 			TEXT NOT NULL,
-	Country 		TEXT NOT NULL,
-	Item_Type 		TEXT NOT NULL,
-	Sales_Channel 	TEXT NOT NULL,
+CREATE TABLE sales_result(
+	Region 			VARCHAR (50) NOT NULL,
+	Country 		VARCHAR (50)NOT NULL,
+	Item_Type 		VARCHAR (50)NOT NULL,
+	Sales_Channel 	VARCHAR (50)NOT NULL,
  	Order_Priority	CHAR(1) NOT NULL,
 	Order_Date		DATE NOT NULL,
 	Order_ID		INT PRIMARY KEY     NOT NULL,
