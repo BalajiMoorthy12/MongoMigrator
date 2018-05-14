@@ -1,0 +1,87 @@
+from pymongo import MongoClient
+from datetime import date 
+def encode_date(value):
+    return datetime.datetime.combine(
+            value,
+            datetime.datetime.min.time())
+def transform_incoming(son):
+    for (key, value) in son.items():
+        if type(value) == datetime.date:
+            son[key] = encode_date(value)
+#        elif isinstance(value, dict):    # recurse into sub-docs
+#            son[key] = transform_incoming(value, collection)
+#           
+    return (son)
+def migrate(table,columns,data_list):
+    client = MongoClient('localhost', 27017)
+    db = client['MyMongo']
+    collection=db[table]
+    doc={}
+    print("mongo")
+    for i in data_list:
+        #print(i)
+        for column,data in zip(columns,i):
+            doc[column]=data
+        #collection.insert(doc)   
+        #[ObjectId('...'), ObjectId('...')]
+        if '_id' in doc: del doc['_id']
+        #if '' in doc: print(12)
+        #print(doc)
+        doc2 = transform_incoming(doc)
+        #print(doc2)
+        #collection.insert_one(doc2)
+        #print(doc)
+    print(collection.count(),"Mongo")
+    #print(table +" table inserted successfully in Mongo")
+
+import datetime  
+from datetime import date 
+import psycopg2
+
+conn = psycopg2.connect(database="dbname", user = "postgres", password = "balaji1212", host = "127.0.0.1", port = "5432")
+
+print("Opened database successfully")
+
+cur = conn.cursor()
+cur2 = conn.cursor()
+cur2.execute("""SELECT table_name
+  FROM information_schema.tables
+ WHERE table_schema='public'
+   AND table_type='BASE TABLE';""")
+column = []
+datatype = []
+table_rows=cur2.fetchall()
+for table in table_rows:
+    query=("SELECT * FROM  information_schema.COLUMNS"
+                " WHERE table_name = '{}'").format(str(table[0]))
+    cur.execute(query)
+    rows = cur.fetchall()
+    column = []
+    datatype = []
+    #print(str(table[0]))
+    for row in rows:
+    #       print("ID = ", row[3])
+        column.append(row[3])
+    #       print("NAME = ", row[7])
+        datatype.append(row[7])
+      # print("ADDRESS = ", row[2])
+      # print("SALARY = ", row[3],"\n")
+      #query=("SELECT * FROM  {}").format(str(table[0]))
+      #migrate(cur,)
+      #cur.execute(query)
+    #print(column)
+    query=("SELECT * FROM ""{}""").format(str(table[0]))
+    cur.execute(query)
+    rows2 = cur.fetchall()
+    print(len(rows2),str(table[0]))
+#    for i in rows2:
+#        print(i)
+#        print("\n")
+    migrate(str(table[0]),column,rows2)
+print("Operation done successfully")
+
+conn.commit()
+print("Records created successfully")
+conn.close()
+#print(column)
+#print(datatype)
