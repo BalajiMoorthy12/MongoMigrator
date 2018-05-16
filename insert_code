@@ -1,36 +1,112 @@
-
+from pymongo import MongoClient
+import datetime 
 from datetime import date
 import psycopg2
+from robot.libraries.BuiltIn import BuiltIn
+def encode_date(value):
+    return datetime.datetime.combine(
+            value,
+            datetime.datetime.min.time())
+def transform_incoming(doc):
+    for (key, value) in doc.items():
+        if type(value) == datetime.date:
+            doc[key] = encode_date(value)
+    return (doc)
+def migrate(table,columns,data_list,dbname):
+    client = MongoClient('localhost', 27017)
+    db = client[dbname]
+    collection=db[table]
+    doc={}
+    for i in data_list:
+        #print(i)
+        for column,data in zip(columns,i):doc[column]=data
+        if '_id' in doc: del doc['_id']
+        doc2 = transform_incoming(doc)
+        collection.insert_one(doc2)
+    return (collection.count())
+    #print(table +" table inserted successfully in Mongo")
+def postgresql_db(passw,user1,dbnamepy):
+    conn = psycopg2.connect(database='dbname', user = user1, password = passw, host = "127.0.0.1", port = "5432")
+    print("Opened database successfully")
+    cur = conn.cursor()
+    cur2 = conn.cursor()
+    cur2.execute("""SELECT table_name
+      FROM information_schema.tables
+     WHERE table_schema='public'
+       AND table_type='BASE TABLE';""")
+    column = []
+    datatype = []
+    count=[]
+    det=[]
+    tabletemp=[]
+    table_rows=cur2.fetchall()
+    for table in table_rows:
+        write_to_console(("Migrating records from {}").format(str(table[0])))
+        query=("SELECT * FROM  information_schema.COLUMNS"
+                    " WHERE table_name = '{}'").format(str(table[0]))
+        cur.execute(query)
+        rows = cur.fetchall()
+        column = []
+        datatype = []
+        for row in rows:
+            column.append(row[3])
+            datatype.append(row[7])
+            query=("SELECT * FROM ""{}""").format(str(table[0]))
+            cur.execute(query)
+            rows2 = cur.fetchall()
+            #print(len(rows2),str(table[0]))
+        mong_count=migrate(str(table[0]),column,rows2,dbnamepy)
+        count.append(mong_count)
+        if mong_count == len(rows2): 
+            print(("From {} table {} records are migrated to MongoDB successfully as collection").format(str(table[0]),mong_count))
+    print("Migration done successfully")
+    conn.commit()
+    print(("Totally {} records from {} tables are migrated from PostgreSQL DB to MongoDB".format(sum(count),len(table_rows))))
+    conn.close()
+    
+#postgresql_db('balaji1212','postgres')
 
-from openpyxl.reader.excel import load_workbook
-conn = psycopg2.connect(database="dbname", user = "postgres", password = "balaji1212", host = "127.0.0.1", port = "5432")
-
-print("Opened database successfully")
-cur = conn.cursor()
-cur2= conn.cursor()
-path = "F:\Mongo\\test.xlsx"
-wb = load_workbook(filename=path)
-#ws=wb.get_sheet_names()
-ws=wb.get_sheet_by_name("Sheet1")
-#query=("SELECT * FROM  information_schema.COLUMNS"
-#                " WHERE table_name = '{}'").format("salesrecords")
-#cur2.execute(query)
-#rows = cur2.fetchall()
-#for i in rows:
-#    print(i[7])
-
-#print(ws.max_row,ws.max_column)
-for row_val in range(2,ws.max_row+1):
-    #print("in For Loop")
-    el=[]
-    #s=(ws.cell(row=row_val, column = 1).value)
-    for coulmn_val in range(1,(ws.max_column)+1):
-        #s=s+","+(ws.cell(row=row_val, column = coulmn_val).value)
-        el.append((ws.cell(row=row_val, column = coulmn_val).value))
-    print(("INSERT INTO {} VALUES('{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}')").format('sales',el[0],el[1],el[2],el[3],((el[4])),datetime.date((el[5])),(el[6]),datetime.date(el[7]),el[8],el[9],el[10],el[11],el[12],el[13]))
-    cur.execute(("INSERT INTO {} VALUES('{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}')").format('sales',el[0],el[1],el[2],el[3],((el[4])),datetime.date((el[5])),(el[6]),datetime.date(el[7]),el[8],el[9],el[10],el[11],el[12],el[13]))
-    #print("done")
-
-conn.commit()
-print("Records created successfully")
-conn.close()
+def postgresql_onlydb(db):
+    conn = psycopg2.connect(database=db, user = 'postgres', password = 'balaji1212', host = "127.0.0.1", port = "5432")
+    print("Opened database successfully")
+    cur = conn.cursor()
+    cur2 = conn.cursor()
+    cur2.execute("""SELECT table_name
+      FROM information_schema.tables
+     WHERE table_schema='public'
+       AND table_type='BASE TABLE';""")
+    column = []
+    datatype = []
+    det=[]
+    tabletemp=[]
+    table_rows=cur2.fetchall()
+    for table in table_rows:
+        query=("SELECT * FROM  information_schema.COLUMNS"
+                    " WHERE table_name = '{}'").format(str(table[0]))
+        cur.execute(query)
+        rows = cur.fetchall()
+        column = []
+        datatype = []
+        for row in rows:
+            column.append(row[3])
+            datatype.append(row[7])
+        query=("SELECT * FROM ""{}""").format(str(table[0]))
+        cur.execute(query)
+        rows2 = cur.fetchall()
+        print(len(rows2),str(table[0]))
+        det.append(len(rows2))
+        tabletemp.append(str(table[0]))
+    #print(det,tabletemp)
+        mongo_count=migrate(str(table[0]),column,rows2)
+        if mongo_count == len(rows2):   
+            print(("{} records are successfully migrated from {} to Mongo collection {}").format(mongo_count,(str(table[0])),(str(table[0]))))    
+    print("Operation done successfully")
+    conn.commit()
+    print("Records created successfully")
+    conn.close()
+    return tabletemp,det
+#print(postgresql_db('balaji1212', 'dbname', 'postgres'))
+def write_to_console(s):
+    
+    BuiltIn().log_to_console("\n")
+    BuiltIn().log_to_console(s)
