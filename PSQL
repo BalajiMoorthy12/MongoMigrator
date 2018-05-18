@@ -1,0 +1,181 @@
+CREATE TABLE COMPANY6(
+   ID INT PRIMARY KEY     NOT NULL,
+   NAME           TEXT    NOT NULL,
+   AGE            INT     NOT NULL,
+   ADDRESS        CHAR(50),
+   SALARY         REAL
+);
+
+CREATE TABLE DEPARTMENT1(
+   ID INT PRIMARY KEY      NOT NULL,
+   DEPT           CHAR(50) NOT NULL,
+   EMP_ID         INT      references COMPANY6(ID)
+);
+
+SELECT * FROM  information_schema.COLUMNS"
+                " WHERE table_name = 'COMPANY6'
+                
+                
+ SELECT
+    tc.table_schema, tc.constraint_name, tc.table_name, kcu.column_name, 
+    ccu.table_schema AS foreign_table_schema,
+    ccu.table_name AS foreign_table_name,
+    ccu.column_name AS foreign_column_name 
+FROM 
+    information_schema.table_constraints AS tc 
+    JOIN information_schema.key_column_usage AS kcu
+      ON tc.constraint_name = kcu.constraint_name
+    JOIN information_schema.constraint_column_usage AS ccu
+      ON ccu.constraint_name = tc.constraint_name
+WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name='department1';
+
+
+from pymongo import MongoClient
+from bson.dbref import DBRef
+from bson.objectid import ObjectId
+import datetime 
+from datetime import date
+from bson.json_util import dumps
+import psycopg2
+client = MongoClient('localhost', 27017)
+db = client['RoboMongMain1']
+def encode_date(value):
+    return datetime.datetime.combine(
+            value,
+            datetime.datetime.min.time())
+def transform_incoming(doc):
+    for (key, value) in doc.items():
+        if type(value) == datetime.date:
+            doc[key] = encode_date(value)
+    return (doc)
+def migrate(table,columns,data_list):
+    collection=db[table]
+    doc={}
+    if (collection.count()) == 0 :
+        for i in data_list:
+            #print(i)
+            for column,data in zip(columns,i):doc[column]=data
+            if '_id' in doc: del doc['_id']
+            doc2 = transform_incoming(doc)
+            collection.insert_one(doc2)
+        return (collection.count())
+
+    #print(table +" table inserted successfully in Mongo")
+def postgresql_db(passw,user1):
+    conn = psycopg2.connect(database='secondary', user = user1, password = passw, host = "127.0.0.1", port = "5432")
+    print("Opened database successfully")
+    cur = conn.cursor()
+    cur2 = conn.cursor()
+    cur3=conn.cursor()
+    cur2.execute("""SELECT table_name
+      FROM information_schema.tables
+     WHERE table_schema='public'
+       AND table_type='BASE TABLE';""")
+    column = []
+    datatype = []
+    count=[]
+    table_rows=cur2.fetchall()
+    for table in table_rows:
+        query=("SELECT * FROM  information_schema.COLUMNS"
+                    " WHERE table_name = '{}'").format(str(table[0]))
+        cur.execute(query)
+        rows = cur.fetchall()
+        column = []
+        datatype = []
+        for row in rows:
+            column.append(row[3])
+            datatype.append(row[7])
+            query=("SELECT * FROM ""{}""").format(str(table[0]))
+            cur.execute(query)
+            rows2 = cur.fetchall()
+            #print(len(rows2),str(table[0]))
+        mong_count=foreignkey_check(str(table[0]),cur3,column,rows2)
+        coll=db[str(table[0])]
+        mong_count=(coll.count())
+        count.append(mong_count)
+        print(("From {} table {} records are migrated to MongoDB successfully as collection").format(str(table[0]),mong_count))
+    print("Migration done successfully")
+    conn.commit()
+    print(("Totally {} records from {} tables are migrated from PostgreSQL DB to MongoDB").format(sum(count),len(table_rows)))
+    conn.close()
+    
+
+
+def foreignkey_check(table_name,cur,columns,data):
+    
+    query=(("SELECT "
+        "tc.table_schema, tc.constraint_name, tc.table_name, kcu.column_name, "
+        "ccu.table_schema AS foreign_table_schema,"
+        "ccu.table_name AS foreign_table_name,"
+        "ccu.column_name AS foreign_column_name "
+    "FROM "
+        "information_schema.table_constraints AS tc "
+        "JOIN information_schema.key_column_usage AS kcu"
+         " ON tc.constraint_name = kcu.constraint_name "
+        "JOIN information_schema.constraint_column_usage AS ccu "
+        "  ON ccu.constraint_name = tc.constraint_name "
+    "WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name='{}';").format(table_name))
+    cur.execute(query)
+    rows = cur.fetchall()
+    column_main=[]
+    if len(rows) != 0: 
+        row=rows[0]
+        foreign_table=(row[2])
+        foreign_key=(row[3])
+        main_table=(row[5])
+        main_key=(row[6])
+        collection=db[main_table]
+        if (collection.count()) != 0 :
+            count=migrate(table_name,columns,data)
+            dbref_insert(foreign_key,foreign_table,main_key,main_table,collection,data,cur)
+            return count
+        else:
+            query=("SELECT * FROM ""{}""").format(main_table)
+            cur.execute(query)
+            rows2 = cur.fetchall()
+            query=("SELECT * FROM  information_schema.COLUMNS"
+                    " WHERE table_name = '{}'").format(main_table)
+            cur.execute(query)
+            row3 = cur.fetchall()
+            for row5 in row3:
+                column_main.append(row5[3])
+            count=migrate_rel(main_table,column_main,rows2)
+            print(("From {} table {} records are migrated to MongoDB successfully as collection").format(main_table,count))
+            count=migrate_rel(table_name,columns,data)
+            dbref_insert(foreign_key,foreign_table,main_key,main_table,collection,data,cur)
+            return count
+    else:
+        count=migrate(table_name,columns,data)
+        return count
+def migrate_rel(table,columns,data_list):
+    collection=db[table]
+    doc={}
+    for i in data_list:
+        for column,data in zip(columns,i):
+            doc[column]=data
+        if '_id' in doc: del doc['_id']
+        doc2 = transform_incoming(doc)
+        collection.insert_one(doc2)
+    return (collection.count())    
+
+def dbref_insert(foreign_key,foreign_table,main_key,main_table,collection,data,cur):
+    for_coll=db[foreign_table]
+    temp_col=db[main_table]
+    #doc=(dumps(for_coll.find_one({foreign_key})))
+    #print(data)
+    foreign_key_id=[]
+    for val in data:
+        s=(((for_coll.find_one({main_key:val[0]},{'_id':1}))))
+        k=((s['_id']))
+        foreign_key_id.append(k)
+        #print(((temp_col.find_one({main_key:val[0]},{'_id':1}))))
+    query=("SELECT * FROM ""{}""").format(main_table)
+    cur.execute(query)
+    row3 = cur.fetchall() 
+    for i,j in zip(row3,foreign_key_id):
+        print(str(i[0]))
+        o=(((temp_col.find_one({main_key:(i[0])},{'_id':1})))) 
+        p=((o['_id']))
+        temp_col.update_one({main_key:(i[0])},{'$set':{foreign_table : ObjectId(j)}},upsert=False)
+    print(("Modeling Referenced Relationships have been done for the MongoDB collections {} and {}").format(main_table,foreign_table))
+postgresql_db('balaji1212','postgres')
